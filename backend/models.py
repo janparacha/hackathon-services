@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Float, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Float, DateTime, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
 
@@ -17,6 +17,8 @@ class Client(Base):
     nom = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     telephone = Column(String)
+    utilisateur_id = Column(Integer, ForeignKey('utilisateurs.id'), unique=True)
+    utilisateur = relationship("Utilisateur", back_populates="client")
     projets = relationship('Projet', back_populates='client')
 
 class Projet(Base):
@@ -37,6 +39,8 @@ class Prestataire(Base):
     telephone = Column(String)
     categorie_metier_id = Column(Integer, ForeignKey('categories_metier.id'))
     categorie_metier = relationship('CategorieMetier', back_populates='prestataires')
+    utilisateur_id = Column(Integer, ForeignKey('utilisateurs.id'), unique=True)
+    utilisateur = relationship("Utilisateur", back_populates="prestataire")
     prestations = relationship('Prestation', back_populates='prestataire')
     note = Column(Float, default=0.0)  # note sur 10
 
@@ -51,3 +55,13 @@ class Prestation(Base):
     categorie_metier_id = Column(Integer, ForeignKey('categories_metier.id'))
     prestataire = relationship('Prestataire', back_populates='prestations')
     categorie_metier = relationship('CategorieMetier', back_populates='prestations') 
+
+class Utilisateur(Base):
+    __tablename__ = 'utilisateurs'
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    role = Column(String, nullable=False)  # 'client', 'prestataire'
+    client = relationship("Client", back_populates="utilisateur", uselist=False)
+    prestataire = relationship("Prestataire", back_populates="utilisateur", uselist=False)

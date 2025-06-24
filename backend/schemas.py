@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime
+from enum import Enum
 
 class ProjetBase(BaseModel):
     titre: str
@@ -59,3 +60,24 @@ class Prestataire(PrestataireBase):
     prestations: List[Prestation] = []
     class Config:
         orm_mode = True 
+
+class RoleEnum(str, Enum):
+    client = "client"
+    prestataire = "prestataire"
+
+class UtilisateurBase(BaseModel):
+    email: EmailStr
+    role: RoleEnum
+
+class UtilisateurCreate(UtilisateurBase):
+    password: str
+
+class Utilisateur(UtilisateurBase):
+    id: int
+    is_active: bool
+
+    class Config:
+        orm_mode = True
+
+
+
