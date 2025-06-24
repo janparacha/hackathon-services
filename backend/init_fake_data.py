@@ -235,62 +235,9 @@ def insert_fake_data():
     utilisateurs = []
     client_utilisateur_map = {}
     prestataire_utilisateur_map = {}
-    # Création des catégories de métiers
-    categories = {}
-    for corps in corps_metiers:
-        cat = models.CategorieMetier(nom=corps["nom"])
-        db.add(cat)
-        db.commit()
-        categories[corps["nom"]] = cat
-    # Génération de prestataires couvrant tous les corps de métiers
-    prestataires = []
-    prestations = []
-    for i in range(1, 101):  # 100 prestataires
-        corps = random.choice(corps_metiers)
-        cat = categories[corps["nom"]]
-        p = models.Prestataire(
-            nom=f"{corps['nom']} Pro {i}",
-            description=f"Prestataire spécialisé en {corps['nom'].lower()}.",
-            email=f"{corps['nom'].lower()}pro{i}@test.com",
-            telephone=f"06{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
-            categorie_metier_id=cat.id,
-            note=round(random.uniform(5, 10), 2)  # note sur 10, entre 5 et 10
-        )
-        prestataires.append(p)
-        db.add(p)
-        db.commit()
-        # 15 prestations aléatoires, sans doublon, pour ce prestataire
-        prestations_choisies = random.sample(corps['prestations'], 15)
-        for titre, description in prestations_choisies:
-            prestations.append(models.Prestation(
-                titre=titre,
-                description=description,
-                prix=random.randint(500, 10000),
-                duree_estimee=random.randint(1, 30),
-                prestataire_id=p.id,
-                categorie_metier_id=cat.id,
-                utilisateur=prestataire_utilisateur_map[i]
 
-            ))
-    # Ajout prestations
-    for p in prestations:
-        db.add(p)
-    db.commit()
-    # Génération de nombreux clients
-    clients = [
-        models.Client(
-            nom=f"Client {i}",
-            email=f"client{i}@test.com",
-            telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
-            utilisateur=client_utilisateur_map[i]
-
-        )
-        for i in range(1, 51)
-    ]
-    for c in clients:
-        db.add(c)
-    db.commit()
-    for i, client in enumerate(range(1, 51), start=1):
+    # Création d'utilisateurs pour les clients
+    for i in range(1, 51):
         email = f"client{i}@test.com"
         password = f"client{i}pass"
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -304,7 +251,7 @@ def insert_fake_data():
         client_utilisateur_map[i] = utilisateur
 
     # Création d'utilisateurs pour les prestataires
-    for i, prestataire in enumerate(range(1, 101), start=1):
+    for i in range(1, 101):
         email = f"prestataire{i}@test.com"
         password = f"prestataire{i}pass"
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -316,9 +263,70 @@ def insert_fake_data():
         )
         utilisateurs.append(utilisateur)
         prestataire_utilisateur_map[i] = utilisateur
-        for u in utilisateurs:
-            db.add(u)
+
+    # Ajout de tous les utilisateurs à la base
+    for u in utilisateurs:
+        db.add(u)
+    db.commit()
+
+    # Création des catégories de métiers
+    categories = {}
+    for corps in corps_metiers:
+        cat = models.CategorieMetier(nom=corps["nom"])
+        db.add(cat)
         db.commit()
+        categories[corps["nom"]] = cat
+
+    # Génération de clients
+    clients = [
+        models.Client(
+            nom=f"Client {i}",
+            email=f"client{i}@test.com",
+            telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
+            utilisateur=client_utilisateur_map[i]
+        )
+        for i in range(1, 51)
+    ]
+    for c in clients:
+        db.add(c)
+    db.commit()
+
+    # Génération de prestataires couvrant tous les corps de métiers
+    prestataires = []
+    for i in range(1, 101):  # 100 prestataires
+        corps = random.choice(corps_metiers)
+        cat = categories[corps["nom"]]
+        p = models.Prestataire(
+            nom=f"{corps['nom']} Pro {i}",
+            description=f"Prestataire spécialisé en {corps['nom'].lower()}.",
+            email=f"{corps['nom'].lower()}pro{i}@test.com",
+            telephone=f"06{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
+            categorie_metier_id=cat.id,
+            note=round(random.uniform(5, 10), 2),  # note sur 10, entre 5 et 10
+            utilisateur=prestataire_utilisateur_map[i]
+        )
+        prestataires.append(p)
+        db.add(p)
+    db.commit()
+
+    # Génération de prestations pour chaque prestataire
+    prestations = []
+    for i, p in enumerate(prestataires, start=1):
+        corps = next(c for c in corps_metiers if c["nom"] == p.categorie_metier.nom)
+        prestations_choisies = random.sample(corps['prestations'], 15)
+        for titre, description in prestations_choisies:
+            prestations.append(models.Prestation(
+                titre=titre,
+                description=description,
+                prix=random.randint(500, 10000),
+                duree_estimee=random.randint(1, 30),
+                prestataire_id=p.id,
+                categorie_metier_id=p.categorie_metier_id
+            ))
+    for p in prestations:
+        db.add(p)
+    db.commit()
+
     # Génération de projets pour chaque client
     projets = [
         models.Projet(
