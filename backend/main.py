@@ -60,24 +60,4 @@ class PromptRequest(BaseModel):
 @app.post("/match_prestataires/")
 def match_prestataires(request: PromptRequest, db: Session = Depends(get_db)):
     results = find_best_prestataires(db, request.prompt)
-    # On retourne les infos du prestataire, de la prestation et le score
-    return [
-        {
-            "prestataire": {
-                "id": r["prestataire"].id,
-                "nom": r["prestataire"].nom,
-                "description": r["prestataire"].description,
-                "email": r["prestataire"].email,
-                "telephone": r["prestataire"].telephone,
-            },
-            "prestation": {
-                "id": r["prestation"].id,
-                "titre": r["prestation"].titre,
-                "description": r["prestation"].description,
-                "prix": r["prestation"].prix,
-                "duree_estimee": r["prestation"].duree_estimee,
-            },
-            "score": r["score"]
-        }
-        for r in results
-    ] 
+    return results 
