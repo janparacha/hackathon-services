@@ -229,64 +229,68 @@ corps_metiers = [
     },
 ]
 
-# Génération de prestataires couvrant tous les corps de métiers
-prestataires = []
-prestations = []
-for i in range(1, 101):  # 100 prestataires
-    corps = random.choice(corps_metiers)
-    p = models.Prestataire(
-        nom=f"{corps['nom']} Pro {i}",
-        description=f"Prestataire spécialisé en {corps['nom'].lower()}.",
-        email=f"{corps['nom'].lower()}pro{i}@test.com",
-        telephone=f"06{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}"
-    )
-    prestataires.append(p)
-    # 15 prestations aléatoires, sans doublon, pour ce prestataire
-    prestations_choisies = random.sample(corps['prestations'], 15)
-    for titre, description in prestations_choisies:
-        prestations.append(models.Prestation(
-            titre=titre,
-            description=description,
-            prix=random.randint(500, 10000),
-            duree_estimee=random.randint(1, 30),
-            prestataire_id=i
-        ))
-
-# Génération de nombreux clients
-clients = [
-    models.Client(
-        nom=f"Client {i}",
-        email=f"client{i}@test.com",
-        telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}"
-    )
-    for i in range(1, 51)
-]
-
-# Génération de projets pour chaque client
-projets = [
-    models.Projet(
-        titre=f"Projet {i}",
-        description=f"Description du projet {i}",
-        client_id=random.randint(1, 50)
-    )
-    for i in range(1, 100)
-]
-
 def insert_fake_data():
     db = SessionLocal()
-    # Ajout prestataires
-    for p in prestataires:
+    # Création des catégories de métiers
+    categories = {}
+    for corps in corps_metiers:
+        cat = models.CategorieMetier(nom=corps["nom"])
+        db.add(cat)
+        db.commit()
+        categories[corps["nom"]] = cat
+    # Génération de prestataires couvrant tous les corps de métiers
+    prestataires = []
+    prestations = []
+    for i in range(1, 101):  # 100 prestataires
+        corps = random.choice(corps_metiers)
+        cat = categories[corps["nom"]]
+        p = models.Prestataire(
+            nom=f"{corps['nom']} Pro {i}",
+            description=f"Prestataire spécialisé en {corps['nom'].lower()}.",
+            email=f"{corps['nom'].lower()}pro{i}@test.com",
+            telephone=f"06{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
+            categorie_metier_id=cat.id,
+            note=round(random.uniform(5, 10), 2)  # note sur 10, entre 5 et 10
+        )
+        prestataires.append(p)
         db.add(p)
-    db.commit()
+        db.commit()
+        # 15 prestations aléatoires, sans doublon, pour ce prestataire
+        prestations_choisies = random.sample(corps['prestations'], 15)
+        for titre, description in prestations_choisies:
+            prestations.append(models.Prestation(
+                titre=titre,
+                description=description,
+                prix=random.randint(500, 10000),
+                duree_estimee=random.randint(1, 30),
+                prestataire_id=p.id,
+                categorie_metier_id=cat.id
+            ))
     # Ajout prestations
     for p in prestations:
         db.add(p)
     db.commit()
-    # Ajout clients
+    # Génération de nombreux clients
+    clients = [
+        models.Client(
+            nom=f"Client {i}",
+            email=f"client{i}@test.com",
+            telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}"
+        )
+        for i in range(1, 51)
+    ]
     for c in clients:
         db.add(c)
     db.commit()
-    # Ajout projets
+    # Génération de projets pour chaque client
+    projets = [
+        models.Projet(
+            titre=f"Projet {i}",
+            description=f"Description du projet {i}",
+            client_id=random.randint(1, 50)
+        )
+        for i in range(1, 100)
+    ]
     for p in projets:
         db.add(p)
     db.commit()

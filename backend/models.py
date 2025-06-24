@@ -4,6 +4,13 @@ from datetime import datetime
 
 Base = declarative_base()
 
+class CategorieMetier(Base):
+    __tablename__ = 'categories_metier'
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String, unique=True, nullable=False)
+    prestations = relationship('Prestation', back_populates='categorie_metier')
+    prestataires = relationship('Prestataire', back_populates='categorie_metier')
+
 class Client(Base):
     __tablename__ = 'clients'
     id = Column(Integer, primary_key=True, index=True)
@@ -28,7 +35,10 @@ class Prestataire(Base):
     description = Column(Text)
     email = Column(String, unique=True, nullable=False)
     telephone = Column(String)
+    categorie_metier_id = Column(Integer, ForeignKey('categories_metier.id'))
+    categorie_metier = relationship('CategorieMetier', back_populates='prestataires')
     prestations = relationship('Prestation', back_populates='prestataire')
+    note = Column(Float, default=0.0)  # note sur 10
 
 class Prestation(Base):
     __tablename__ = 'prestations'
@@ -38,4 +48,6 @@ class Prestation(Base):
     prix = Column(Float)
     duree_estimee = Column(Integer)  # durée en jours
     prestataire_id = Column(Integer, ForeignKey('prestataires.id'))
-    prestataire = relationship('Prestataire', back_populates='prestations') 
+    categorie_metier_id = Column(Integer, ForeignKey('categories_metier.id'))
+    prestataire = relationship('Prestataire', back_populates='prestations')
+    categorie_metier = relationship('CategorieMetier', back_populates='prestations') 
