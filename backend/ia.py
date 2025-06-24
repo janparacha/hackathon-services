@@ -9,39 +9,22 @@ import random
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Liste fermée de métiers supportés
-METIERS = [
-    "maçon", "charpentier", "électricien", "plombier", "architecte", "couvreur", "menuisier",
-    "peintre", "chauffagiste", "plaquiste", "carreleur", "paysagiste", "terrassier"
-]
-metiers_str = ", ".join(f'"{m}"' for m in METIERS)
-
 # Fonction qui interroge Ollama localement pour extraire les prestations à partir d'un prompt
 # Retourne une liste de prestations, ou lève une Exception explicite si échec
 
 def extract_prestations_llm(prompt: str, db: Session):
-    # Récupérer dynamiquement les métiers et prestations depuis la base
+    # Récupérer dynamiquement les métiers depuis la base
     categories = db.query(models.CategorieMetier).all()
+    if not categories:
+        raise RuntimeError("Aucune catégorie de métier n'est présente en base. Veuillez initialiser les catégories avant d'utiliser le LLM.")
     metiers = [cat.nom for cat in categories]
     metiers_str = ', '.join(f'"{m}"' for m in metiers)
-    prestations_par_metier = {}
-    for cat in categories:
-        prestations = db.query(models.Prestation).filter(models.Prestation.categorie_metier_id == cat.id).all()
-        titres = sorted(set(p.titre for p in prestations))
-        if titres:
-            prestations_par_metier[cat.nom] = titres
-    # Construction du prompt
+    # Construction du prompt (on ne donne plus la liste des prestations)
     prompt_llm = (
         f"Tu es un assistant expert en gestion de projet de construction. "
         f"Pour la demande suivante : '{prompt}', "
         f"donne uniquement une liste Python de tuples (prestation, métier) où chaque prestation est associée à son corps de métier principal. "
         f"Le métier doit obligatoirement être choisi dans la liste suivante : [{metiers_str}]. "
-        f"Pour chaque métier, voici la liste des prestations possibles :\n"
-    )
-    for metier, titres in prestations_par_metier.items():
-        prompt_llm += f"- {metier} : {titres}\n"
-    prompt_llm += (
-        f"Choisis uniquement des intitulés de prestations et des métiers dans ces listes. "
         f"Format attendu : [(\"prestation 1\", \"métier 1\"), (\"prestation 2\", \"métier 2\"), ...] "
         f"Réponds uniquement par la liste Python, sans texte ni explication, ni markdown, ni numérotation."
     )
@@ -65,27 +48,19 @@ def extract_prestations_llm(prompt: str, db: Session):
         print(f"[DEBUG] Texte reconstitué : {full_text}")
 
         # Extraction stricte d'une liste Python de tuples
+        # On cherche la première [ et la dernière ] pour extraire la liste
         start = full_text.find('[')
-        end = full_text.find(']', start)
+        end = full_text.rfind(']')
         if start != -1 and end != -1:
+            liste_str = full_text[start:end+1]
             try:
-                liste_str = full_text[start:end+1]
                 prestations = ast.literal_eval(liste_str)
-                # On attend une liste de tuples (prestation, métier)
                 if isinstance(prestations, list) and all(isinstance(x, tuple) and len(x) == 2 for x in prestations):
                     return [(str(p).strip(), str(m).strip()) for p, m in prestations]
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[ERROR] Echec literal_eval : {e} sur {liste_str}")
 
-        # Fallback : extraction ligne par ligne (rare)
-        prestations = []
-        for line in full_text.splitlines():
-            match = re.match(r"^\s*['\"]?(.+?)['\"]?\s*,\s*['\"]?(.+?)['\"]?\s*$", line)
-            if match:
-                prestations.append((match.group(1).strip(), match.group(2).strip()))
-        if prestations:
-            return prestations
-
+        # Si on arrive ici, c'est que le parsing a échoué
         raise ValueError(f"Impossible d'extraire une liste de tuples (prestation, métier). Texte généré : {full_text}")
 
     except requests.exceptions.ConnectionError:
@@ -114,70 +89,195 @@ def find_best_prestataires(db: Session, prompt: str, top_k: int = 3):
         return {"error": str(e)}
     if not prestations_base or len(prestations_base) == 0:
         return {"error": "Aucune prestation extraite de la demande"}
-    plans = generate_plans(prestations_base)
-    result = []
-    for idx, prestations_plan in enumerate(plans):
-        plan_prestations = []
-        budget_total = 0
-        duree_total = 0
-        for prestation_nom, metier in prestations_plan:
-            # Matching strict : on ne retient que les prestations ET prestataires de la bonne catégorie de métier
-            cat = db.query(models.CategorieMetier).filter(models.CategorieMetier.nom.ilike(metier)).first()
-            if not cat:
-                continue
-            all_prestations = db.query(models.Prestation).filter(
-                models.Prestation.titre.ilike(f"%{prestation_nom}%"),
-                models.Prestation.categorie_metier_id == cat.id
-            ).all()
-            if not all_prestations:
-                # fallback : matching sémantique sur toutes les prestations de la bonne catégorie
-                all_prestations = db.query(models.Prestation).filter(models.Prestation.categorie_metier_id == cat.id).all()
-                if not all_prestations:
-                    continue
-                emb_prest = model.encode(prestation_nom, convert_to_tensor=True)
-                prestations_texts = [f"{p.titre} {p.description or ''}" for p in all_prestations]
-                prestations_emb = model.encode(prestations_texts, convert_to_tensor=True)
-                scores = util.pytorch_cos_sim(emb_prest, prestations_emb)[0]
-                scored = list(zip(all_prestations, scores.tolist()))
-                # Trier d'abord par score sémantique, puis par note du prestataire
-                scored.sort(key=lambda x: (x[1], db.query(models.Prestataire).filter(models.Prestataire.id == x[0].prestataire_id).first().note), reverse=True)
-                top_prest = [x[0] for x in scored[:top_k]]
-            else:
-                # Trier par note du prestataire (décroissant), puis prix croissant
-                all_prestations.sort(key=lambda p: (-(db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first().note or 0), p.prix or 1e9))
-                top_prest = all_prestations[:top_k]
-            # Pour le calcul du budget/durée du plan, on prend le moins cher/rapide
-            prix_min = min([p.prix for p in top_prest if p.prix is not None] or [0])
-            duree_min = min([p.duree_estimee for p in top_prest if p.duree_estimee is not None] or [0])
-            budget_total += prix_min
-            duree_total += duree_min
-            plan_prestations.append({
+
+    # Pour chaque prestation, on prépare la liste des matches (prestataires/prestations) possibles
+    prestations_matches = []
+    for prestation_nom, metier in prestations_base:
+        cat = db.query(models.CategorieMetier).filter(models.CategorieMetier.nom.ilike(metier)).first()
+        if not cat:
+            prestations_matches.append({
                 "titre": prestation_nom,
                 "metier": metier,
-                "matches": [
-                    {
-                        "prestataire": {
-                            "id": db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first().id,
-                            "nom": db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first().nom,
-                            "description": db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first().description,
-                            "email": db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first().email,
-                            "telephone": db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first().telephone,
-                            "note": db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first().note,
-                        },
-                        "prestation": {
-                            "id": p.id,
-                            "titre": p.titre,
-                            "description": p.description,
-                            "prix": p.prix,
-                            "duree_estimee": p.duree_estimee,
-                        }
-                    } for p in top_prest
-                ]
+                "matches": []
             })
-        result.append({
-            "plan": idx+1,
-            "budget": budget_total,
-            "duree": duree_total,
-            "prestations": plan_prestations
+            continue
+        all_prestations = db.query(models.Prestation).filter(models.Prestation.categorie_metier_id == cat.id).all()
+        if not all_prestations:
+            prestations_matches.append({
+                "titre": prestation_nom,
+                "metier": metier,
+                "matches": []
+            })
+            continue
+        # Matching sémantique systématique (sur toute la base de la catégorie)
+        emb_prest = model.encode(prestation_nom, convert_to_tensor=True)
+        prestations_texts = [f"{p.titre} {p.description or ''}" for p in all_prestations]
+        prestations_emb = model.encode(prestations_texts, convert_to_tensor=True)
+        scores = util.pytorch_cos_sim(emb_prest, prestations_emb)[0]
+        scored = list(zip(all_prestations, scores.tolist()))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        if not scored:
+            prestations_matches.append({
+                "titre": prestation_nom,
+                "metier": metier,
+                "matches": []
+            })
+            continue
+        # On prend TOUTES les prestations de la catégorie, pas juste le top 3
+        matches = []
+        for p, score in scored:
+            prest = db.query(models.Prestataire).filter(models.Prestataire.id == p.prestataire_id).first()
+            matches.append({
+                "prestataire": {
+                    "id": prest.id,
+                    "nom": prest.nom,
+                    "description": prest.description,
+                    "email": prest.email,
+                    "telephone": prest.telephone,
+                    "note": prest.note,
+                },
+                "prestation": {
+                    "id": p.id,
+                    "titre": p.titre,
+                    "description": p.description,
+                    "prix": p.prix,
+                    "duree_estimee": p.duree_estimee,
+                },
+                "score": score  # Ajout du score de similarité
+            })
+        # Ajoute systématiquement la prestation du LLM, matches vide si aucun match
+        prestations_matches.append({
+            "titre": prestation_nom,
+            "metier": metier,
+            "matches": matches
         })
-    return result 
+
+    # Génération des 3 plans
+    plans = []
+    alpha = 0.7  # pondération critère plan
+    beta = 0.3   # pondération similarité sémantique
+
+    # Plan 1 : le moins cher possible (éco)
+    plan1_prestations = []
+    budget1_min = 0
+    budget1_max = 0
+    duree1_min = 0
+    duree1_max = 0
+    for pm in prestations_matches:
+        matches = pm["matches"]
+        if not matches:
+            plan1_prestations.append({**pm, "matches": []})
+            continue
+        # Normalisation du score sémantique
+        sem_scores = [m["score"] for m in matches]
+        min_sem, max_sem = min(sem_scores), max(sem_scores)
+        def norm_sem(s):
+            return (s - min_sem) / (max_sem - min_sem) if max_sem > min_sem else 1.0
+        # Score composite : prix + similarité
+        for m in matches:
+            prix = m["prestation"]["prix"] or 1e9
+            sem = norm_sem(m["score"])
+            m["score_total"] = alpha * prix + beta * (1 - sem)
+        sorted_matches = sorted(matches, key=lambda m: m["score_total"])
+        best3 = sorted_matches[:top_k]
+        plan1_prestations.append({**pm, "matches": best3})
+        prixs = [m["prestation"]["prix"] or 0 for m in best3]
+        durees = [m["prestation"]["duree_estimee"] or 0 for m in best3]
+        if prixs:
+            budget1_min += min(prixs)
+            budget1_max += max(prixs)
+        if durees:
+            duree1_min += min(durees)
+            duree1_max += max(durees)
+    plans.append({
+        "plan": 1,
+        "label": "Économique",
+        "description": "Le moins cher possible, durée potentiellement longue.",
+        "budget": (budget1_min, budget1_max),
+        "duree": (duree1_min, duree1_max),
+        "prestations": plan1_prestations
+    })
+    # Plan 2 : le plus rapide possible
+    plan2_prestations = []
+    budget2_min = 0
+    budget2_max = 0
+    duree2_min = 0
+    duree2_max = 0
+    for pm in prestations_matches:
+        matches = pm["matches"]
+        if not matches:
+            plan2_prestations.append({**pm, "matches": []})
+            continue
+        sem_scores = [m["score"] for m in matches]
+        min_sem, max_sem = min(sem_scores), max(sem_scores)
+        def norm_sem(s):
+            return (s - min_sem) / (max_sem - min_sem) if max_sem > min_sem else 1.0
+        for m in matches:
+            duree = m["prestation"]["duree_estimee"] or 1e9
+            sem = norm_sem(m["score"])
+            m["score_total"] = alpha * duree + beta * (1 - sem)
+        sorted_matches = sorted(matches, key=lambda m: m["score_total"])
+        best3 = sorted_matches[:top_k]
+        plan2_prestations.append({**pm, "matches": best3})
+        prixs = [m["prestation"]["prix"] or 0 for m in best3]
+        durees = [m["prestation"]["duree_estimee"] or 0 for m in best3]
+        if prixs:
+            budget2_min += min(prixs)
+            budget2_max += max(prixs)
+        if durees:
+            duree2_min += min(durees)
+            duree2_max += max(durees)
+    plans.append({
+        "plan": 2,
+        "label": "Rapide",
+        "description": "Le plus rapide possible, quitte à payer plus cher.",
+        "budget": (budget2_min, budget2_max),
+        "duree": (duree2_min, duree2_max),
+        "prestations": plan2_prestations
+    })
+    # Plan 3 : équilibré (score mixte)
+    plan3_prestations = []
+    budget3_min = 0
+    budget3_max = 0
+    duree3_min = 0
+    duree3_max = 0
+    for pm in prestations_matches:
+        matches = pm["matches"]
+        if not matches:
+            plan3_prestations.append({**pm, "matches": []})
+            continue
+        prixs = [m["prestation"]["prix"] or 0 for m in matches]
+        durees = [m["prestation"]["duree_estimee"] or 0 for m in matches]
+        if not prixs or not durees:
+            plan3_prestations.append({**pm, "matches": []})
+            continue
+        prix_med = sorted(prixs)[len(prixs)//2]
+        duree_med = sorted(durees)[len(durees)//2]
+        sem_scores = [m["score"] for m in matches]
+        min_sem, max_sem = min(sem_scores), max(sem_scores)
+        def norm_sem(s):
+            return (s - min_sem) / (max_sem - min_sem) if max_sem > min_sem else 1.0
+        for m in matches:
+            prix = m["prestation"]["prix"] or 0
+            duree = m["prestation"]["duree_estimee"] or 0
+            sem = norm_sem(m["score"])
+            dist = abs(prix - prix_med) + abs(duree - duree_med)
+            m["score_total"] = alpha * dist + beta * (1 - sem)
+        sorted_matches = sorted(matches, key=lambda m: m["score_total"])
+        best3 = sorted_matches[:top_k]
+        plan3_prestations.append({**pm, "matches": best3})
+        prixs_best3 = [m["prestation"]["prix"] or 0 for m in best3]
+        durees_best3 = [m["prestation"]["duree_estimee"] or 0 for m in best3]
+        budget3_min += min(prixs_best3)
+        budget3_max += max(prixs_best3)
+        duree3_min += min(durees_best3)
+        duree3_max += max(durees_best3)
+    plans.append({
+        "plan": 3,
+        "label": "Équilibré",
+        "description": "Un compromis entre prix et durée.",
+        "budget": (budget3_min, budget3_max),
+        "duree": (duree3_min, duree3_max),
+        "prestations": plan3_prestations
+    })
+    return plans 
