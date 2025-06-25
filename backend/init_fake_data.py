@@ -232,43 +232,6 @@ corps_metiers = [
 
 def insert_fake_data():
     db = SessionLocal()
-    utilisateurs = []
-    client_utilisateur_map = {}
-    prestataire_utilisateur_map = {}
-
-    # Création d'utilisateurs pour les clients
-    for i in range(1, 51):
-        email = f"client{i}@test.com"
-        password = f"client{i}pass"
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        utilisateur = models.Utilisateur(
-            email=email,
-            hashed_password=hashed_password,
-            is_active=True,
-            role="client"
-        )
-        utilisateurs.append(utilisateur)
-        client_utilisateur_map[i] = utilisateur
-
-    # Création d'utilisateurs pour les prestataires
-    for i in range(1, 101):
-        email = f"prestataire{i}@test.com"
-        password = f"prestataire{i}pass"
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        utilisateur = models.Utilisateur(
-            email=email,
-            hashed_password=hashed_password,
-            is_active=True,
-            role="prestataire"
-        )
-        utilisateurs.append(utilisateur)
-        prestataire_utilisateur_map[i] = utilisateur
-
-    # Ajout de tous les utilisateurs à la base
-    for u in utilisateurs:
-        db.add(u)
-    db.commit()
-
     # Création des catégories de métiers
     categories = {}
     for corps in corps_metiers:
@@ -276,23 +239,9 @@ def insert_fake_data():
         db.add(cat)
         db.commit()
         categories[corps["nom"]] = cat
-
-    # Génération de clients
-    clients = [
-        models.Client(
-            nom=f"Client {i}",
-            email=f"client{i}@test.com",
-            telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
-            utilisateur=client_utilisateur_map[i]
-        )
-        for i in range(1, 51)
-    ]
-    for c in clients:
-        db.add(c)
-    db.commit()
-
     # Génération de prestataires couvrant tous les corps de métiers
     prestataires = []
+    prestations = []
     for i in range(1, 101):  # 100 prestataires
         corps = random.choice(corps_metiers)
         cat = categories[corps["nom"]]
@@ -302,17 +251,12 @@ def insert_fake_data():
             email=f"{corps['nom'].lower()}pro{i}@test.com",
             telephone=f"06{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
             categorie_metier_id=cat.id,
-            note=round(random.uniform(5, 10), 2),  # note sur 10, entre 5 et 10
-            utilisateur=prestataire_utilisateur_map[i]
+            note=round(random.uniform(5, 10), 2)  # note sur 10, entre 5 et 10
         )
         prestataires.append(p)
         db.add(p)
-    db.commit()
-
-    # Génération de prestations pour chaque prestataire
-    prestations = []
-    for i, p in enumerate(prestataires, start=1):
-        corps = next(c for c in corps_metiers if c["nom"] == p.categorie_metier.nom)
+        db.commit()
+        # 15 prestations aléatoires, sans doublon, pour ce prestataire
         prestations_choisies = random.sample(corps['prestations'], 15)
         for titre, description in prestations_choisies:
             prestations.append(models.Prestation(
@@ -321,12 +265,25 @@ def insert_fake_data():
                 prix=random.randint(500, 10000),
                 duree_estimee=random.randint(1, 30),
                 prestataire_id=p.id,
-                categorie_metier_id=p.categorie_metier_id
+                categorie_metier_id=cat.id
             ))
+    # Ajout prestations
     for p in prestations:
         db.add(p)
     db.commit()
-
+    # Génération de nombreux clients
+    clients = [
+        models.Client(
+            nom=f"Client {i}",
+            email=f"client{i}@test.com",
+            telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}"
+        )
+        for i in range(1, 51)
+    ]
+    for c in clients:
+        db.add(c)
+    db.commit()
+    
     # Génération de projets pour chaque client
     projets = [
         models.Projet(

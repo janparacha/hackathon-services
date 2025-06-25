@@ -60,24 +60,3 @@ class Prestataire(PrestataireBase):
     prestations: List[Prestation] = []
     class Config:
         orm_mode = True 
-
-class RoleEnum(str, Enum):
-    client = "client"
-    prestataire = "prestataire"
-
-class UtilisateurBase(BaseModel):
-    email: EmailStr
-    role: RoleEnum
-
-class UtilisateurCreate(UtilisateurBase):
-    password: str
-
-class Utilisateur(UtilisateurBase):
-    id: int
-    is_active: bool
-
-    class Config:
-        orm_mode = True
-
-
-

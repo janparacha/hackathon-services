@@ -4,7 +4,7 @@ services:
     image: postgres:15
     restart: always
     env_file:
-      - .env
+      - backend/.env
     ports:
       - "5432:5432"
     volumes:
@@ -13,13 +13,13 @@ services:
     build: ./backend
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - ./backend:/app
+      - ./backend:/backend
     ports:
       - "8000:8000"
     depends_on:
       - db
     env_file:
-      - .env
+      - backend/.env
   adminer:
     image: adminer
     restart: always
@@ -27,5 +27,15 @@ services:
       - "8080:8080"
     depends_on:
       - db
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
 volumes:
   pgdata: 
