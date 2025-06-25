@@ -20,6 +20,20 @@ services:
       - db
     env_file:
       - .env
+  frontend:
+    build: ./front
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    volumes:
+      - ./front:/app
+      - /app/node_modules
+      # - /app/.next
   adminer:
     image: adminer
     restart: always
