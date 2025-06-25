@@ -6,8 +6,18 @@ from ia import find_best_prestataires
 from pydantic import BaseModel
 import time
 from sqlalchemy.exc import OperationalError
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Autoriser le CORS pour le frontend Next.js en dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Pour dev : reset complet de la base à chaque démarrage
 # with engine.begin() as conn:
