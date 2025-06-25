@@ -14,7 +14,7 @@ class Projet(ProjetBase):
     date_creation: datetime
     client_id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ClientBase(BaseModel):
     nom: str
@@ -24,11 +24,11 @@ class ClientBase(BaseModel):
 class ClientCreate(ClientBase):
     pass
 
-class Client(ClientBase):
+class Client(BaseModel):
     id: int
     projets: List[Projet] = []
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PrestationBase(BaseModel):
     titre: str
@@ -43,7 +43,7 @@ class Prestation(PrestationBase):
     id: int
     prestataire_id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PrestataireBase(BaseModel):
     nom: str
@@ -54,8 +54,85 @@ class PrestataireBase(BaseModel):
 class PrestataireCreate(PrestataireBase):
     pass
 
-class Prestataire(PrestataireBase):
+class Prestataire(BaseModel):
     id: int
     prestations: List[Prestation] = []
     class Config:
-        orm_mode = True 
+        from_attributes = True
+
+class PrestataireLight(BaseModel):
+    id: int
+    nom: str
+    description: Optional[str] = None
+    email: str
+    telephone: Optional[str] = None
+    note: Optional[float] = None
+    class Config:
+        from_attributes = True
+
+class ConditionProjetPrestationBase(BaseModel):
+    nom: str
+    remplie: bool = False
+
+class ConditionProjetPrestationCreate(ConditionProjetPrestationBase):
+    condition_prestation_id: int
+
+class ConditionProjetPrestation(BaseModel):
+    id: int
+    condition_prestation_id: int
+    nom: str
+    remplie: bool = False
+    class Config:
+        from_attributes = True
+
+class ProjetPrestationBase(BaseModel):
+    prestation_id: int
+    prestataire_id: int
+    statut: Optional[str] = 'à faire'
+
+class ProjetPrestationCreate(ProjetPrestationBase):
+    pass
+
+class ProjetPrestation(BaseModel):
+    id: int
+    prestation_id: int
+    prestataire_id: int
+    statut: Optional[str] = 'à faire'
+    conditions: List[ConditionProjetPrestation] = []
+    class Config:
+        from_attributes = True
+
+class ConditionPrestationBase(BaseModel):
+    description: str
+    obligatoire: bool = True
+    prestation_id: Optional[int] = None
+    categorie_metier_id: Optional[int] = None
+
+class ConditionPrestationCreate(ConditionPrestationBase):
+    pass
+
+class ConditionPrestation(BaseModel):
+    id: int
+    description: str
+    obligatoire: bool = True
+    prestation_id: Optional[int] = None
+    categorie_metier_id: Optional[int] = None
+    class Config:
+        from_attributes = True
+
+class ProjetPrestationDetail(BaseModel):
+    id: int
+    prestation: Prestation
+    prestataire: PrestataireLight
+    statut: str
+    conditions: List[ConditionProjetPrestation] = []
+    class Config:
+        from_attributes = True
+
+class ProjetDetail(ProjetBase):
+    id: int
+    date_creation: datetime
+    client_id: int
+    projets_prestations: List[ProjetPrestationDetail] = []
+    class Config:
+        from_attributes = True 

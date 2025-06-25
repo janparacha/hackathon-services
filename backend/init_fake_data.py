@@ -1,6 +1,7 @@
 import models
 from database import SessionLocal
 import random
+from tqdm import tqdm
 
 # Définition de plusieurs corps de métiers et types de prestations
 corps_metiers = [
@@ -641,7 +642,7 @@ def insert_fake_data():
     # Génération de prestataires couvrant tous les corps de métiers
     prestataires = []
     prestations = []
-    for i in range(1, 501):  # 500 prestataires
+    for i in tqdm(range(1, 501), desc='Insertion des prestataires'):
         corps = random.choice(corps_metiers)
         cat = categories[corps["nom"]]
         p = models.Prestataire(
@@ -655,7 +656,7 @@ def insert_fake_data():
         prestataires.append(p)
         db.add(p)
         db.commit()
-        # 15 prestations aléatoires, sans doublon, pour ce prestataire
+        # 25 prestations aléatoires, sans doublon, pour ce prestataire
         prestations_choisies = random.sample(corps['prestations'], 25)
         for titre, description in prestations_choisies:
             prestations.append(models.Prestation(
@@ -667,8 +668,18 @@ def insert_fake_data():
                 categorie_metier_id=cat.id
             ))
     # Ajout prestations
-    for p in prestations:
+    for p in tqdm(prestations, desc='Insertion des prestations & conditions'):
         db.add(p)
+        db.commit()
+        # Ajout de 0, 1 ou 2 conditions template pour chaque prestation
+        n_conditions = random.randint(0, 2)
+        for i in range(n_conditions):
+            db.add(models.ConditionPrestation(
+                prestation_id=p.id,
+                description=f"Condition {i+1} pour '{p.titre}'",
+                obligatoire=random.choice([0, 1]),
+                categorie_metier_id=p.categorie_metier_id
+            ))
     db.commit()
     # Génération de nombreux clients
     clients = [
@@ -681,18 +692,6 @@ def insert_fake_data():
     ]
     for c in clients:
         db.add(c)
-    db.commit()
-    # Génération de projets pour chaque client
-    projets = [
-        models.Projet(
-            titre=f"Projet {i}",
-            description=f"Description du projet {i}",
-            client_id=random.randint(1, 50)
-        )
-        for i in range(1, 100)
-    ]
-    for p in projets:
-        db.add(p)
     db.commit()
     db.close()
 

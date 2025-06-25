@@ -1,0 +1,30 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+
+# Environnements virtuels
+venv/
+.env/
+.envrc/
+.venv/
+
+# Fichiers de logs et temporaires
+*.log
+*.tmp
+*.swp
+
+# Fichiers de configuration d'IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Autres fichiers à ignorer
+*.bak 
