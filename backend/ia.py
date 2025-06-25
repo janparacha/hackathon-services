@@ -154,8 +154,8 @@ def find_best_prestataires(db: Session, prompt: str, top_k: int = 3):
 
     # Génération des 3 plans
     plans = []
-    alpha = 0.7  # pondération critère plan
-    beta = 0.3   # pondération similarité sémantique
+    coeff_critere = 0.3  # pondération critère plan
+    coeff_semantique = 0.7   # pondération similarité sémantique
 
     # Plan 1 : le moins cher possible (éco)
     plan1_prestations = []
@@ -177,7 +177,7 @@ def find_best_prestataires(db: Session, prompt: str, top_k: int = 3):
         for m in matches:
             prix = m["prestation"]["prix"] or 1e9
             sem = norm_sem(m["score"])
-            m["score_total"] = alpha * prix + beta * (1 - sem)
+            m["score_total"] = coeff_critere * prix + coeff_semantique * (1 - sem)
         sorted_matches = sorted(matches, key=lambda m: m["score_total"])
         best3 = sorted_matches[:top_k]
         plan1_prestations.append({**pm, "matches": best3})
@@ -215,7 +215,7 @@ def find_best_prestataires(db: Session, prompt: str, top_k: int = 3):
         for m in matches:
             duree = m["prestation"]["duree_estimee"] or 1e9
             sem = norm_sem(m["score"])
-            m["score_total"] = alpha * duree + beta * (1 - sem)
+            m["score_total"] = coeff_critere * duree + coeff_semantique * (1 - sem)
         sorted_matches = sorted(matches, key=lambda m: m["score_total"])
         best3 = sorted_matches[:top_k]
         plan2_prestations.append({**pm, "matches": best3})
@@ -262,7 +262,7 @@ def find_best_prestataires(db: Session, prompt: str, top_k: int = 3):
             duree = m["prestation"]["duree_estimee"] or 0
             sem = norm_sem(m["score"])
             dist = abs(prix - prix_med) + abs(duree - duree_med)
-            m["score_total"] = alpha * dist + beta * (1 - sem)
+            m["score_total"] = coeff_critere * dist + coeff_semantique * (1 - sem)
         sorted_matches = sorted(matches, key=lambda m: m["score_total"])
         best3 = sorted_matches[:top_k]
         plan3_prestations.append({**pm, "matches": best3})

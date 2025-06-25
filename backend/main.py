@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models, schemas, crud
@@ -10,9 +10,9 @@ from sqlalchemy.exc import OperationalError
 app = FastAPI()
 
 # Pour dev : reset complet de la base à chaque démarrage
-with engine.begin() as conn:
-    models.Base.metadata.drop_all(bind=conn)
-    models.Base.metadata.create_all(bind=conn)
+# with engine.begin() as conn:
+#     models.Base.metadata.drop_all(bind=conn)
+#     models.Base.metadata.create_all(bind=conn)
 
 # Attendre que la base soit prête (utile pour Docker)
 for _ in range(30):
@@ -60,4 +60,44 @@ class PromptRequest(BaseModel):
 @app.post("/match_prestataires/")
 def match_prestataires(request: PromptRequest, db: Session = Depends(get_db)):
     results = find_best_prestataires(db, request.prompt)
-    return results 
+    return results
+
+class ProjetCompletCreate(BaseModel):
+    titre: str
+    description: str = None
+    client_id: int
+    prestations: list[int]  # Liste d'IDs de prestations
+
+@app.post('/projets/complet', response_model=schemas.Projet)
+def create_projet_complet_endpoint(data: ProjetCompletCreate, db: Session = Depends(get_db)):
+    projet_data = schemas.ProjetCreate(titre=data.titre, description=data.description)
+    projet = crud.create_projet_complet(db, projet_data, data.client_id, data.prestations)
+    return projet
+
+@app.get('/projets/{projet_id}/detail', response_model=schemas.ProjetDetail)
+def get_projet_detail_endpoint(projet_id: int = Path(...), db: Session = Depends(get_db)):
+    projet = crud.get_projet_detail(db, projet_id)
+    if not projet:
+        raise HTTPException(status_code=404, detail='Projet non trouvé')
+    return projet
+
+class ConditionUpdateRequest(BaseModel):
+    remplie: bool
+
+@app.patch('/conditions/{condition_id}', response_model=schemas.ConditionProjetPrestation)
+def update_condition_endpoint(condition_id: int, data: ConditionUpdateRequest, db: Session = Depends(get_db)):
+    cond = crud.update_condition_projet_prestation(db, condition_id, data.remplie)
+    if not cond:
+        raise HTTPException(status_code=404, detail='Condition non trouvée')
+    return schemas.ConditionProjetPrestation.from_orm(cond)
+
+@app.delete('/projets/{projet_id}')
+def delete_projet_endpoint(projet_id: int, db: Session = Depends(get_db)):
+    ok = crud.delete_projet(db, projet_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail='Projet non trouvé')
+    return {"detail": "Projet supprimé"}
+
+@app.get('/clients/{client_id}/projets', response_model=list[schemas.Projet])
+def get_projets_by_client_endpoint(client_id: int, db: Session = Depends(get_db)):
+    return crud.get_projets_by_client(db, client_id) 
