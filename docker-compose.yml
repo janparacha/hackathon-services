@@ -40,5 +40,14 @@ services:
       - "8080:8080"
     depends_on:
       - db
+  ollama:
+    build: 
+      context: ./ollama
+      dockerfile: Dockerfile
+    volumes:
+      - ./ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+
 volumes:
   pgdata: 

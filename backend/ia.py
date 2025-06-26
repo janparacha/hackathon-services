@@ -28,7 +28,7 @@ def extract_prestations_llm(prompt: str, db: Session):
         f"Format attendu : [(\"prestation 1\", \"métier 1\"), (\"prestation 2\", \"métier 2\"), ...] "
         f"Réponds uniquement par la liste Python, sans texte ni explication, ni markdown, ni numérotation."
     )
-    url = "http://host.docker.internal:11434/api/generate"
+    url = "http://ollama:11434/api/generate"
     payload = {
         "model": "mistral",
         "prompt": prompt_llm
