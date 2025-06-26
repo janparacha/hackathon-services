@@ -41,14 +41,23 @@ export default function ProjectManagerAI() {
     plan: number,
     validated?: boolean
   } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const getProjectFromPrompt = async (prompt: string) => {
+    setLoading(true)
+    setError(null)
     fetchPost(`http://localhost:8000/match_prestataires/`, {
       prompt: prompt
-    }).then(res => {
-      console.log(res);
-      setProjets(res)
     })
+      .then(res => {
+        setProjets(res)
+        setLoading(false)
+      })
+      .catch(err => {
+        setError(err.message || 'Erreur inconnue')
+        setLoading(false)
+      })
   }
 
   const currentProjet = projets.find((p: Projet) => p.plan === selectedPlan)
@@ -103,6 +112,8 @@ export default function ProjectManagerAI() {
             <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-2">
               Visualisez et gérez vos projets avec leurs prestations et prestataires
             </p>
+            {loading && <div className="text-blue-600 font-semibold mt-2">Chargement...</div>}
+            {error && <div className="text-red-600 font-semibold mt-2">Erreur : {error}</div>}
           </div>
 
           {/* Section pitch client */}

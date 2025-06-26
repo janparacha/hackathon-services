@@ -59,7 +59,23 @@ def extract_prestations_llm(prompt: str, db: Session):
                     return [(str(p).strip(), str(m).strip()) for p, m in prestations]
             except Exception as e:
                 print(f"[ERROR] Echec literal_eval : {e} sur {liste_str}")
-
+                # Fallback 1 : liste de strings représentant des tuples
+                try:
+                    prestations_strs = ast.literal_eval(liste_str)
+                    if isinstance(prestations_strs, list) and all(isinstance(x, str) for x in prestations_strs):
+                        prestations = [ast.literal_eval(x) for x in prestations_strs]
+                        if all(isinstance(x, tuple) and len(x) == 2 for x in prestations):
+                            return [(str(p).strip(), str(m).strip()) for p, m in prestations]
+                    # Fallback 2 : liste contenant une seule string qui concatène tous les tuples
+                    if isinstance(prestations_strs, list) and len(prestations_strs) == 1 and isinstance(prestations_strs[0], str):
+                        try:
+                            prestations = ast.literal_eval(f"[{prestations_strs[0]})]")
+                            if isinstance(prestations, list) and all(isinstance(x, tuple) and len(x) == 2 for x in prestations):
+                                return [(str(p).strip(), str(m).strip()) for p, m in prestations]
+                        except Exception as e3:
+                            print(f"[ERROR] Echec fallback parsing string unique : {e3} sur {prestations_strs[0]}")
+                except Exception as e2:
+                    print(f"[ERROR] Echec fallback parsing liste de strings : {e2} sur {liste_str}")
         # Si on arrive ici, c'est que le parsing a échoué
         raise ValueError(f"Impossible d'extraire une liste de tuples (prestation, métier). Texte généré : {full_text}")
 

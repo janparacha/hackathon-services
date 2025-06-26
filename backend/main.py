@@ -69,8 +69,13 @@ class PromptRequest(BaseModel):
 
 @app.post("/match_prestataires/")
 def match_prestataires(request: PromptRequest, db: Session = Depends(get_db)):
-    results = find_best_prestataires(db, request.prompt)
-    return results
+    try:
+        results = find_best_prestataires(db, request.prompt)
+        if isinstance(results, dict) and "error" in results:
+            raise HTTPException(status_code=400, detail=results["error"])
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 class ProjetCompletCreate(BaseModel):
     titre: str
