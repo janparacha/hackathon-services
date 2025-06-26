@@ -1,7 +1,11 @@
 import models
 from database import SessionLocal
 import random
+<<<<<<< HEAD
 from tqdm import tqdm
+=======
+import bcrypt
+>>>>>>> 8a9aeaf (creer model, crud, schema utilisateur et l'ajouter au faker)
 
 # Définition de plusieurs corps de métiers et types de prestations
 corps_metiers = [
@@ -632,6 +636,9 @@ corps_metiers = [
 
 def insert_fake_data():
     db = SessionLocal()
+    utilisateurs = []
+    client_utilisateur_map = {}
+    prestataire_utilisateur_map = {}
     # Création des catégories de métiers
     categories = {}
     for corps in corps_metiers:
@@ -665,7 +672,9 @@ def insert_fake_data():
                 prix=random.randint(500, 10000),
                 duree_estimee=random.randint(1, 30),
                 prestataire_id=p.id,
-                categorie_metier_id=cat.id
+                categorie_metier_id=cat.id,
+                utilisateur=prestataire_utilisateur_map[i]
+
             ))
     # Ajout prestations
     for p in tqdm(prestations, desc='Insertion des prestations & conditions'):
@@ -686,14 +695,60 @@ def insert_fake_data():
         models.Client(
             nom=f"Client {i}",
             email=f"client{i}@test.com",
-            telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}"
+            telephone=f"07{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
+            utilisateur=client_utilisateur_map[i]
+
         )
         for i in range(1, 51)
     ]
     for c in clients:
         db.add(c)
     db.commit()
+<<<<<<< HEAD
+=======
+    for i, client in enumerate(range(1, 51), start=1):
+        email = f"client{i}@test.com"
+        password = f"client{i}pass"
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        utilisateur = models.Utilisateur(
+            email=email,
+            hashed_password=hashed_password,
+            is_active=True,
+            role="client"
+        )
+        utilisateurs.append(utilisateur)
+        client_utilisateur_map[i] = utilisateur
+
+    # Création d'utilisateurs pour les prestataires
+    for i, prestataire in enumerate(range(1, 101), start=1):
+        email = f"prestataire{i}@test.com"
+        password = f"prestataire{i}pass"
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        utilisateur = models.Utilisateur(
+            email=email,
+            hashed_password=hashed_password,
+            is_active=True,
+            role="prestataire"
+        )
+        utilisateurs.append(utilisateur)
+        prestataire_utilisateur_map[i] = utilisateur
+        for u in utilisateurs:
+            db.add(u)
+        db.commit()
+    # Génération de projets pour chaque client
+    projets = [
+        models.Projet(
+            titre=f"Projet {i}",
+            description=f"Description du projet {i}",
+            client_id=random.randint(1, 50)
+        )
+        for i in range(1, 100)
+    ]
+    for p in projets:
+        db.add(p)
+    db.commit()
+>>>>>>> 8a9aeaf (creer model, crud, schema utilisateur et l'ajouter au faker)
     db.close()
 
 if __name__ == "__main__":
-    insert_fake_data() 
+    insert_fake_data()

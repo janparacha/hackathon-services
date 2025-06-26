@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Dependencies
 node_modules/
 backend/__pycache__/
@@ -106,3 +107,6 @@ Thumbs.db
 
 # Autres fichiers à ignorer
 *.bak 
+=======
+.env
+>>>>>>> 8a9aeaf (creer model, crud, schema utilisateur et l'ajouter au faker)
