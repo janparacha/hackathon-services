@@ -52,7 +52,6 @@ def create_projet(db: Session, projet: schemas.ProjetCreate, client_id: int):
     db.add(db_projet)
     db.commit()
     db.refresh(db_projet)
-<<<<<<< HEAD
     return db_projet
 
 def create_projet_complet(db: Session, projet_data: schemas.ProjetCreate, client_id: int, prestations: list):
@@ -140,32 +139,3 @@ def delete_projet(db: Session, projet_id: int):
 
 def get_projets_by_client(db: Session, client_id: int):
     return db.query(models.Projet).filter(models.Projet.client_id == client_id).all() 
-=======
-    return db_projet 
-
-
-def get_utilisateur(db: Session, utilisateur_id: int):
-    return db.query(models.Utilisateur).filter(models.Utilisateur.id == utilisateur_id).first()
-
-def get_utilisateur_by_email(db: Session, email: str):
-    return db.query(models.Utilisateur).filter(models.Utilisateur.email == email).first()
-
-def get_utilisateurs(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Utilisateur).offset(skip).limit(limit).all()
-
-def create_utilisateur(db: Session, utilisateur: schemas.UtilisateurCreate):
-    password = utilisateur.password.encode('utf-8')
-    salt = bcrypt.gensalt()
-    hashed_password = bcrypt.hashpw(password, salt)
-    
-    db_utilisateur = models.Utilisateur(
-        email=utilisateur.email,
-        hashed_password=hashed_password,
-        is_active=True,
-        role=utilisateur.role,
-    )
-    db.add(db_utilisateur)
-    db.commit()
-    db.refresh(db_utilisateur)
-    return db_utilisateur
->>>>>>> 8a9aeaf (creer model, crud, schema utilisateur et l'ajouter au faker)

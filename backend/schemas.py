@@ -59,7 +59,6 @@ class Prestataire(BaseModel):
     id: int
     prestations: List[Prestation] = []
     class Config:
-<<<<<<< HEAD
         from_attributes = True
 
 class PrestataireLight(BaseModel):
@@ -138,27 +137,3 @@ class ProjetDetail(ProjetBase):
     projets_prestations: List[ProjetPrestationDetail] = []
     class Config:
         from_attributes = True 
-=======
-        orm_mode = True 
-
-class RoleEnum(str, Enum):
-    client = "client"
-    prestataire = "prestataire"
-
-class UtilisateurBase(BaseModel):
-    email: EmailStr
-    role: RoleEnum
-
-class UtilisateurCreate(UtilisateurBase):
-    password: str
-
-class Utilisateur(UtilisateurBase):
-    id: int
-    is_active: bool
-
-    class Config:
-        orm_mode = True
-
-
-
->>>>>>> 8a9aeaf (creer model, crud, schema utilisateur et l'ajouter au faker)
