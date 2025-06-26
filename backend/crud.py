@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
 import models, schemas
-import bcrypt
 
 def get_client(db: Session, client_id: int):
     return db.query(models.Client).filter(models.Client.id == client_id).first()
@@ -52,6 +51,7 @@ def create_projet(db: Session, projet: schemas.ProjetCreate, client_id: int):
     db.add(db_projet)
     db.commit()
     db.refresh(db_projet)
+<<<<<<< HEAD
     return db_projet
 
 def create_projet_complet(db: Session, projet_data: schemas.ProjetCreate, client_id: int, prestations: list):

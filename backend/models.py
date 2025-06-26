@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Float, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Float, DateTime
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
 
@@ -56,6 +56,7 @@ class Prestation(Base):
     prestataire_id = Column(Integer, ForeignKey('prestataires.id'))
     categorie_metier_id = Column(Integer, ForeignKey('categories_metier.id'))
     prestataire = relationship('Prestataire', back_populates='prestations')
+<<<<<<< HEAD
     categorie_metier = relationship('CategorieMetier', back_populates='prestations')
 
 # ProjetPrestation = instance d'une prestation pour un projet donné

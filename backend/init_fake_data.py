@@ -1,7 +1,11 @@
 import models
 from database import SessionLocal
 import random
+<<<<<<< HEAD
 from tqdm import tqdm
+=======
+import bcrypt
+>>>>>>> 8a9aeaf (creer model, crud, schema utilisateur et l'ajouter au faker)
 
 # Définition de plusieurs corps de métiers et types de prestations
 corps_metiers = [
@@ -700,6 +704,50 @@ def insert_fake_data():
     for c in clients:
         db.add(c)
     db.commit()
+<<<<<<< HEAD
+=======
+    for i, client in enumerate(range(1, 51), start=1):
+        email = f"client{i}@test.com"
+        password = f"client{i}pass"
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        utilisateur = models.Utilisateur(
+            email=email,
+            hashed_password=hashed_password,
+            is_active=True,
+            role="client"
+        )
+        utilisateurs.append(utilisateur)
+        client_utilisateur_map[i] = utilisateur
+
+    # Création d'utilisateurs pour les prestataires
+    for i, prestataire in enumerate(range(1, 101), start=1):
+        email = f"prestataire{i}@test.com"
+        password = f"prestataire{i}pass"
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        utilisateur = models.Utilisateur(
+            email=email,
+            hashed_password=hashed_password,
+            is_active=True,
+            role="prestataire"
+        )
+        utilisateurs.append(utilisateur)
+        prestataire_utilisateur_map[i] = utilisateur
+        for u in utilisateurs:
+            db.add(u)
+        db.commit()
+    # Génération de projets pour chaque client
+    projets = [
+        models.Projet(
+            titre=f"Projet {i}",
+            description=f"Description du projet {i}",
+            client_id=random.randint(1, 50)
+        )
+        for i in range(1, 100)
+    ]
+    for p in projets:
+        db.add(p)
+    db.commit()
+>>>>>>> 8a9aeaf (creer model, crud, schema utilisateur et l'ajouter au faker)
     db.close()
 
 if __name__ == "__main__":

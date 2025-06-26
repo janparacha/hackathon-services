@@ -1,7 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from enum import Enum
 
 class ProjetBase(BaseModel):
     titre: str
@@ -59,6 +58,7 @@ class Prestataire(BaseModel):
     id: int
     prestations: List[Prestation] = []
     class Config:
+<<<<<<< HEAD
         from_attributes = True
 
 class PrestataireLight(BaseModel):
