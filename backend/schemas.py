@@ -58,7 +58,6 @@ class Prestataire(BaseModel):
     id: int
     prestations: List[Prestation] = []
     class Config:
-<<<<<<< HEAD
         from_attributes = True
 
 class PrestataireLight(BaseModel):
