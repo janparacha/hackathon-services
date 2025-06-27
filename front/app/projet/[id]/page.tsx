@@ -38,7 +38,6 @@ export default function ProjetDetailPage() {
     setError(null);
     try {
       await fetchPatch(`http://localhost:8000/conditions/${conditionId}`, { remplie: true });
-      // Refetch le projet pour mettre à jour l'UI
       if (id) {
         await fetchProjet(id);
       }
@@ -48,6 +47,10 @@ export default function ProjetDetailPage() {
       setLoadingConditionId(null);
     }
   };
+
+  // Calcul du montant et de la durée totaux
+  const totalBudget = projet?.projets_prestations.reduce((sum, pp) => sum + (pp.prestation.prix || 0), 0) || 0
+  const totalDuree = projet?.projets_prestations.reduce((sum, pp) => sum + (pp.prestation.duree_estimee || 0), 0) || 0
 
   if (loading) return <div className="max-w-3xl mx-auto py-10 px-4 text-blue-600">Chargement...</div>
   if (error) return <div className="max-w-3xl mx-auto py-10 px-4 text-red-600">Erreur : {error}</div>
@@ -61,9 +64,11 @@ export default function ProjetDetailPage() {
         </h1>
         <div className="text-gray-600 mb-1 text-lg font-medium">{projet.description}</div>
         <div className="flex flex-wrap gap-4 text-xs text-gray-500 mb-1">
-          <span className="bg-blue-50 px-2 py-1 rounded">ID : {projet.id}</span>
-          <span className="bg-green-50 px-2 py-1 rounded">Client : {projet.client_id}</span>
           <span className="bg-gray-100 px-2 py-1 rounded">Créé le {new Date(projet.date_creation).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+        </div>
+        <div className="flex gap-6 text-base font-semibold mt-2">
+          <div>Montant total : <span className="text-blue-700">{totalBudget.toLocaleString()} €</span></div>
+          <div>Durée totale : <span className="text-blue-700">{totalDuree} jours</span></div>
         </div>
       </div>
       <div className="space-y-6">

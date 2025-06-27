@@ -83,11 +83,11 @@ class ProjetCompletCreate(BaseModel):
     client_id: int
     prestations: list[int]  # Liste d'IDs de prestations
 
-@app.post('/projets/complet', response_model=schemas.Projet)
+@app.post('/projets/complet')
 def create_projet_complet_endpoint(data: ProjetCompletCreate, db: Session = Depends(get_db)):
     projet_data = schemas.ProjetCreate(titre=data.titre, description=data.description)
     projet = crud.create_projet_complet(db, projet_data, data.client_id, data.prestations)
-    return projet
+    return {"id": projet.id}
 
 @app.get('/projets/{projet_id}/detail', response_model=schemas.ProjetDetail)
 def get_projet_detail_endpoint(projet_id: int = Path(...), db: Session = Depends(get_db)):

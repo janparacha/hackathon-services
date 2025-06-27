@@ -651,7 +651,7 @@ def insert_fake_data():
             email=f"{corps['nom'].lower()}pro{i}@test.com",
             telephone=f"06{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}{random.randint(10,99)}",
             categorie_metier_id=cat.id,
-            note=round(random.uniform(5, 10), 2)  # note sur 10, entre 5 et 10
+            note=round(random.uniform(0, 10), 2)  # note sur 10, entre 0 et 10
         )
         prestataires.append(p)
         db.add(p)
