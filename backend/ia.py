@@ -19,14 +19,21 @@ def extract_prestations_llm(prompt: str, db: Session):
         raise RuntimeError("Aucune catégorie de métier n'est présente en base. Veuillez initialiser les catégories avant d'utiliser le LLM.")
     metiers = [cat.nom for cat in categories]
     metiers_str = ', '.join(f'"{m}"' for m in metiers)
+    metiers_set = set(metiers)
     # Construction du prompt (on ne donne plus la liste des prestations)
     prompt_llm = (
         f"Tu es un assistant expert en gestion de projet de construction. "
+        f"Tu dois répondre en français. "
         f"Pour la demande suivante : '{prompt}', "
         f"donne uniquement une liste Python de tuples (prestation, métier) où chaque prestation est associée à son corps de métier principal. "
         f"Le métier doit obligatoirement être choisi dans la liste suivante : [{metiers_str}]. "
+        f"Pour chaque tuple, le métier doit être exactement (égalité stricte) un des éléments de la liste, sans ajout, modification ou variante. Si tu ne respectes pas cela, recommence et ne rends rien d'autre. "
+        f"N'invente jamais de métier, n'en modifie pas l'orthographe, et n'utilise que ceux de la liste, sinon recommence. "
+        f"Si tu ne peux pas associer un métier de la liste à une prestation, ignore cette prestation. "
         f"Format attendu : [(\"prestation 1\", \"métier 1\"), (\"prestation 2\", \"métier 2\"), ...] "
-        f"Réponds uniquement par la liste Python, sans texte ni explication, ni markdown, ni numérotation."
+        f"Tu dois obligatoirement respecter le format attendu. Il est strictement interdit d'utiliser des expressions conditionnelles, du code, None, if, else, des variables, ou des commentaires dans la liste. Uniquement des tuples (texte, métier) valides. "
+        f"Réponds uniquement par la liste Python, sans texte, sans explication, sans markdown, sans numérotation, sans phrase d'introduction ou de conclusion. "
+        f"N'ajoute rien d'autre que la liste demandée. "
     )
     url = "http://ollama:11434/api/generate"
     payload = {
@@ -55,23 +62,70 @@ def extract_prestations_llm(prompt: str, db: Session):
             liste_str = full_text[start:end+1]
             try:
                 prestations = ast.literal_eval(liste_str)
-                if isinstance(prestations, list) and all(isinstance(x, tuple) and len(x) == 2 for x in prestations):
-                    return [(str(p).strip(), str(m).strip()) for p, m in prestations]
+                # Nouveau : gérer les listes mixtes (tuples et chaînes)
+                if isinstance(prestations, list):
+                    tuples = []
+                    for x in prestations:
+                        if isinstance(x, tuple) and len(x) == 2:
+                            tuples.append((str(x[0]).strip(), str(x[1]).strip()))
+                        elif isinstance(x, str):
+                            try:
+                                t = ast.literal_eval(x)
+                                if isinstance(t, tuple) and len(t) == 2:
+                                    tuples.append((str(t[0]).strip(), str(t[1]).strip()))
+                            except Exception:
+                                continue
+                    if tuples:
+                        tuples = [(p, m) for (p, m) in tuples if m in metiers_set]
+                        return tuples
+                # Fallback : liste de chaînes 'prestation, métier'
+                if isinstance(prestations, list) and all(isinstance(x, str) and ',' in x for x in prestations):
+                    tuples = []
+                    for x in prestations:
+                        parts = x.split(',')
+                        if len(parts) == 2:
+                            tuples.append((parts[0].strip(), parts[1].strip()))
+                    if tuples:
+                        tuples = [(p, m) for (p, m) in tuples if m in metiers_set]
+                        return tuples
             except Exception as e:
                 print(f"[ERROR] Echec literal_eval : {e} sur {liste_str}")
                 # Fallback 1 : liste de strings représentant des tuples
                 try:
                     prestations_strs = ast.literal_eval(liste_str)
                     if isinstance(prestations_strs, list) and all(isinstance(x, str) for x in prestations_strs):
-                        prestations = [ast.literal_eval(x) for x in prestations_strs]
-                        if all(isinstance(x, tuple) and len(x) == 2 for x in prestations):
-                            return [(str(p).strip(), str(m).strip()) for p, m in prestations]
+                        prestations = []
+                        for x in prestations_strs:
+                            try:
+                                t = ast.literal_eval(x)
+                                if isinstance(t, tuple) and len(t) == 2:
+                                    prestations.append((str(t[0]).strip(), str(t[1]).strip()))
+                            except Exception:
+                                # Fallback regex si ast.literal_eval échoue
+                                x_clean = x.replace("\\'", "'")
+                                m = re.match(r"\('([^']+)', '([^']+)'\)", x_clean)
+                                if m:
+                                    prestations.append((m.group(1).strip(), m.group(2).strip()))
+                        if prestations:
+                            prestations = [(p, m) for (p, m) in prestations if m in metiers_set]
+                            return prestations
+                        # Fallback : liste de chaînes 'prestation, métier'
+                        if all(isinstance(x, str) and ',' in x for x in prestations_strs):
+                            tuples = []
+                            for x in prestations_strs:
+                                parts = x.split(',')
+                                if len(parts) == 2:
+                                    tuples.append((parts[0].strip(), parts[1].strip()))
+                            if tuples:
+                                tuples = [(p, m) for (p, m) in tuples if m in metiers_set]
+                                return tuples
                     # Fallback 2 : liste contenant une seule string qui concatène tous les tuples
                     if isinstance(prestations_strs, list) and len(prestations_strs) == 1 and isinstance(prestations_strs[0], str):
                         try:
                             prestations = ast.literal_eval(f"[{prestations_strs[0]})]")
                             if isinstance(prestations, list) and all(isinstance(x, tuple) and len(x) == 2 for x in prestations):
-                                return [(str(p).strip(), str(m).strip()) for p, m in prestations]
+                                prestations = [(str(p).strip(), str(m).strip()) for p, m in prestations if str(m).strip() in metiers_set]
+                                return prestations
                         except Exception as e3:
                             print(f"[ERROR] Echec fallback parsing string unique : {e3} sur {prestations_strs[0]}")
                 except Exception as e2:
@@ -251,7 +305,7 @@ def find_best_prestataires(db: Session, prompt: str, top_k: int = 3):
         "duree": (duree2_min, duree2_max),
         "prestations": plan2_prestations
     })
-    # Plan 3 : équilibré (score mixte)
+    # Plan 3 : mieux noté (note des prestataires)
     plan3_prestations = []
     budget3_min = 0
     budget3_max = 0
@@ -262,36 +316,22 @@ def find_best_prestataires(db: Session, prompt: str, top_k: int = 3):
         if not matches:
             plan3_prestations.append({**pm, "matches": []})
             continue
-        prixs = [m["prestation"]["prix"] or 0 for m in matches]
-        durees = [m["prestation"]["duree_estimee"] or 0 for m in matches]
-        if not prixs or not durees:
-            plan3_prestations.append({**pm, "matches": []})
-            continue
-        prix_med = sorted(prixs)[len(prixs)//2]
-        duree_med = sorted(durees)[len(durees)//2]
-        sem_scores = [m["score"] for m in matches]
-        min_sem, max_sem = min(sem_scores), max(sem_scores)
-        def norm_sem(s):
-            return (s - min_sem) / (max_sem - min_sem) if max_sem > min_sem else 1.0
-        for m in matches:
-            prix = m["prestation"]["prix"] or 0
-            duree = m["prestation"]["duree_estimee"] or 0
-            sem = norm_sem(m["score"])
-            dist = abs(prix - prix_med) + abs(duree - duree_med)
-            m["score_total"] = coeff_critere * dist + coeff_semantique * (1 - sem)
-        sorted_matches = sorted(matches, key=lambda m: m["score_total"])
+        # Trier par note du prestataire (décroissant)
+        sorted_matches = sorted(matches, key=lambda m: m["prestataire"]["note"] if m["prestataire"].get("note") is not None else 0, reverse=True)
         best3 = sorted_matches[:top_k]
         plan3_prestations.append({**pm, "matches": best3})
         prixs_best3 = [m["prestation"]["prix"] or 0 for m in best3]
         durees_best3 = [m["prestation"]["duree_estimee"] or 0 for m in best3]
-        budget3_min += min(prixs_best3)
-        budget3_max += max(prixs_best3)
-        duree3_min += min(durees_best3)
-        duree3_max += max(durees_best3)
+        if prixs_best3:
+            budget3_min += min(prixs_best3)
+            budget3_max += max(prixs_best3)
+        if durees_best3:
+            duree3_min += min(durees_best3)
+            duree3_max += max(durees_best3)
     plans.append({
         "plan": 3,
-        "label": "Équilibré",
-        "description": "Un compromis entre prix et durée.",
+        "label": "Mieux noté",
+        "description": "Les meilleures notes de prestataires pour chaque prestation.",
         "budget": (budget3_min, budget3_max),
         "duree": (duree3_min, duree3_max),
         "prestations": plan3_prestations
