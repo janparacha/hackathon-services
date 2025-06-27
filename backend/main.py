@@ -64,14 +64,6 @@ def create_prestataire(prestataire: schemas.PrestataireCreate, db: Session = Dep
 def read_prestataires(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_prestataires(db, skip=skip, limit=limit)
 
-@app.post('/utilisateurs/', response_model=schemas.Utilisateur)
-def create_utilisateur(utilisateur: schemas.UtilisateurCreate, db: Session = Depends(get_db)):
-    return crud.create_utilisateur(db, utilisateur)
-
-@app.get('/utilisateurs/', response_model=list[schemas.Utilisateur])
-def read_utilisateurs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return crud.get_utilisateurs(db, skip=skip, limit=limit)
-
 class PromptRequest(BaseModel):
     prompt: str
 
