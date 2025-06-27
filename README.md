@@ -84,6 +84,9 @@ uvicorn main:app --reload
 ├── backend/         # Backend FastAPI
 │   ├── Dockerfile
 │   └── requirements.txt
+├── ollama/         # ollama 
+│   ├── Dockerfile
+│   └── entrypoint.sh
 ├── docker-compose.yml
 └── .env
 ```
